@@ -1,13 +1,14 @@
 {
   "name": "yihu-expiry",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "type": "module",
   "engines": { "node": ">=20" },
   "scripts": {
     "start": "node src/server.js",
     "test": "node scripts/run-tests.mjs",
-    "e2e": "node e2e/run.mjs"
+    "e2e": "node e2e/run.mjs",
+    "e2e:slim": "node e2e/slim.mjs"
   },
   "dependencies": {
     "ejs": "^3.1.10",

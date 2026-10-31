@@ -118,7 +118,7 @@ try {
   {
     const { ctx, page } = await loginContext(browser, 11, { width: 375, height: 667 })
     check('空态有说明和批量录入入口', await page.locator('.empty [data-batch]').count() === 1)
-    check('版本号 v0.1.0', (await page.locator('#version').textContent()) === 'v0.1.0')
+    check('版本号 v0.1.1', (await page.locator('#version').textContent()) === 'v0.1.1')
     await page.screenshot({ path: `${OUT}/375-empty.png` })
     await audit(page, '375 空态')
     await ctx.close()

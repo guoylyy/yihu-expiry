@@ -1,6 +1,6 @@
 import test, { after, before, beforeEach } from 'node:test'
 import assert from 'node:assert/strict'
-import { readdir, rm, stat } from 'node:fs/promises'
+import { readFile, readdir, rm, stat } from 'node:fs/promises'
 import path from 'node:path'
 import { startHarness } from './support/harness.js'
 import { createApp, formatAmount } from '../src/app.js'
@@ -46,7 +46,7 @@ const stored = async () => (await readdir(path.join(h.dataDir, 'attachments')).c
 test('/health 免登录，返回规定格式', async () => {
   const r = await fetch(`${h.base}/health`)
   assert.equal(r.status, 200)
-  assert.deepEqual(await r.json(), { status: 'ok', version: '0.1.0' })
+  assert.deepEqual(await r.json(), { status: 'ok', version: '0.1.1' })
 })
 
 test('版本号三处一致：清单、package.json、页面', async () => {
@@ -226,6 +226,81 @@ test('看板 HTML：三种颜色、相对天数、负责人姓名；用户内容
   assert.ok(text.includes('已过期 5 天') && text.includes('60 天后'))
   assert.ok(text.includes('李雷'))
   assert.ok(!text.includes('<img src=x'))
+})
+
+const cardsOf = (html) => html.slice(html.indexOf('<ul class="cards">'))
+const count = (text, word) => text.split(word).length - 1
+
+test('看板 HTML：没负责人的卡片不渲染负责人这行，也不写「未指定」', async () => {
+  await create(alice, { name: '空的甲' })
+  await create(alice, { name: '空的乙' })
+  const { text } = await alice.get('/api/board.html')
+  const cards = cardsOf(text)
+  assert.equal(count(cards, 'class="card t-'), 2)
+  assert.ok(!cards.includes('负责人'))
+  assert.ok(!cards.includes('未指定'))
+  assert.ok(!cards.includes('—'))
+  assert.ok(!cards.includes('>无<'))
+})
+
+test('看板 HTML：有负责人的才渲染这行，同一页里互不影响', async () => {
+  await create(alice, { name: '空的' })
+  await create(alice, { name: '有人', assignee_id: BOB })
+  const cards = cardsOf((await alice.get('/api/board.html')).text)
+  assert.equal(count(cards, '<dt>负责人</dt>'), 1)
+  assert.equal(count(cards, '<dd>李雷</dd>'), 1)
+  assert.equal(count(cards, '<dt>到期日</dt>'), 2)
+})
+
+test('看板 HTML：没附件的卡片不渲染附件行，有附件的才有', async () => {
+  await create(alice, { name: '甲' })
+  const withFile = await create(alice, { name: '乙' })
+  assert.ok(!cardsOf((await alice.get('/api/board.html')).text).includes('附件'))
+  await alice.upload(withFile.id, 'a.pdf', PDF)
+  const cards = cardsOf((await alice.get('/api/board.html')).text)
+  assert.equal(count(cards, '<dt>附件</dt>'), 1)
+  assert.equal(count(cards, 'class="att"'), 1)
+})
+
+test('看板 HTML：金额、备注为空时卡片上没有对应的行', async () => {
+  await create(alice, { name: '空的' })
+  const cards = cardsOf((await alice.get('/api/board.html')).text)
+  assert.ok(!cards.includes('金额') && !cards.includes('备注'))
+})
+
+test('筛选里的「未指定」保留，能筛出没指派的，选中态也在', async () => {
+  await create(alice, { name: '空的' })
+  await create(alice, { name: '有人', assignee_id: BOB })
+  const all = (await alice.get('/api/board.html')).text
+  assert.ok(all.includes('<option value="none">未指定</option>'))
+  const none = (await alice.get('/api/board.html?who=none')).text
+  assert.ok(none.includes('<option value="none" selected>未指定</option>'))
+  assert.equal(count(cardsOf(none), 'class="card t-'), 1)
+  assert.ok(none.includes('空的') && !none.includes('有人'))
+})
+
+test('首页：整页只有筛选里那一处「未指定」', async () => {
+  await create(alice, { name: '空的甲' })
+  await create(alice, { name: '空的乙' })
+  assert.equal(count((await alice.get('/')).text, '未指定'), 1)
+})
+
+test('新建表单：负责人、金额、备注标选填，名称和到期日不标，金额键盘不变', async () => {
+  const { text } = await alice.get('/')
+  assert.equal(count(text, '<span class="opt">选填</span>'), 3)
+  for (const label of ['负责人', '金额', '备注']) assert.ok(text.includes(`${label}<span class="opt">选填</span>`), label)
+  assert.ok(text.includes('<span>名称</span>') && text.includes('<span>到期日</span>'))
+  assert.ok(/id="f-name"[^>]*required/.test(text) && /id="f-due"[^>]*required/.test(text))
+  assert.ok(/id="f-amount"[^>]*inputmode="decimal"/.test(text))
+  for (const key of ['assign', 'amount', 'note', 'att']) assert.ok(text.includes(`data-optional="${key}"`), key)
+})
+
+test('清单：版本 0.1.1 且两处一致，手动发布', async () => {
+  const read = async (f) => JSON.parse(await readFile(new URL(`../${f}`, import.meta.url), 'utf8'))
+  const [manifest, pkg] = await Promise.all([read('yh-app.json'), read('package.json')])
+  assert.equal(manifest.version, '0.1.1')
+  assert.equal(pkg.version, manifest.version)
+  assert.equal(manifest.deploy.mode, 'manual')
 })
 
 // ---------- 权限 ----------

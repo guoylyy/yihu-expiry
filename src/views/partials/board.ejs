@@ -41,7 +41,9 @@
         </div>
         <dl class="kv">
           <div><dt>到期日</dt><dd><%= t.due_date %></dd></div>
-          <div><dt>负责人</dt><dd><%= t.assignee || '未指定' %></dd></div>
+          <% if (t.assignee_id) { %>
+            <div><dt>负责人</dt><dd><%= t.assignee %></dd></div>
+          <% } %>
           <% if (t.attachment) { %>
             <div class="kv-att"><dt>附件</dt><dd><a class="att" href="<%= t.attachment.url %>" target="_blank" rel="noopener" aria-label="打开附件：<%= t.attachment.name %>"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="m21 11-8.8 8.8a5.5 5.5 0 0 1-7.8-7.8l9.2-9.2a3.7 3.7 0 0 1 5.2 5.2l-9.2 9.2a1.8 1.8 0 0 1-2.6-2.6l8.5-8.5"/></svg><span><%= t.attachment.name %></span></a></dd></div>
           <% } %>

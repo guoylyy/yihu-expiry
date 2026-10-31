@@ -77,7 +77,7 @@ board?.addEventListener('change', (e) => {
 // ---------- 条目弹层：新建和详情是同一张表单 ----------
 function setAssignee(id, name) {
   assignee = { id, name }
-  $('f-assign-name').textContent = id ? name : '未指定'
+  $('f-assign-name').textContent = id ? name : '选择负责人'
 }
 
 function showAttachment(att) {
@@ -105,6 +105,18 @@ function setHint(text) {
   $('sheet-hint').hidden = !text
 }
 
+// 详情里空的选填项整行不显示。创建人还要能补填，所以折起来而不是去掉
+function foldEmpty(t) {
+  const empty = { assign: !t.assignee_id, amount: !t.amount, note: !t.note, att: !t.attachment }
+  for (const [key, isEmpty] of Object.entries(empty)) sheet.querySelector(`[data-optional="${key}"]`).hidden = isEmpty
+  $('sheet-more').hidden = !t.mine || !Object.values(empty).some(Boolean)
+}
+
+function unfold() {
+  for (const el of sheet.querySelectorAll('[data-optional]')) el.hidden = false
+  $('sheet-more').hidden = true
+}
+
 function fill(t) {
   $('f-name').value = t.name || ''
   $('f-due').value = t.due_date || ''
@@ -122,6 +134,7 @@ function openNew() {
   $('sheet-save').textContent = '保存'
   setHint('')
   fill({})
+  unfold()
   setReadOnly(false)
   sheet.showModal()
   $('f-name').focus()
@@ -133,6 +146,7 @@ function openExisting(t) {
   $('sheet-save').textContent = '保存'
   setHint(t.mine ? '' : `${t.from} 创建，只有创建人能修改`)
   fill(t)
+  foldEmpty(t)
   setReadOnly(!t.mine)
   sheet.showModal()
 }
@@ -181,6 +195,7 @@ $('item-form').addEventListener('submit', async (e) => {
         await upload(saved.id, file)
       } catch (err) {
         openExisting(saved)
+        unfold() // 附件这行要留着，好重新选文件
         $('f-file-name').textContent = FILE_HINT
         await loadBoard().catch(() => {})
         return toast(`条目已保存，附件没传上：${err.message}`)
@@ -224,6 +239,7 @@ $('sheet-delete').addEventListener('click', async () => {
   } catch (err) { toast(err.message) }
 })
 
+$('sheet-more').addEventListener('click', unfold)
 $('open-new')?.addEventListener('click', openNew)
 
 // ---------- 批量录入 ----------

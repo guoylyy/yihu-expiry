@@ -17,6 +17,7 @@ node --env-file=.env src/server.js
 ```bash
 npm test     # 真实 MySQL：没给 TEST_DATABASE_URL 就用 Docker 起临时库，跑完删掉
 npm run e2e  # Playwright：独立实例（3180）+ 临时库，经 /apps/expiry 前缀访问，截图在 artifacts/e2e/
+npm run e2e:slim  # v0.1.0 和当前版本跑同一批 7 条，对比 375 页面高度，截图同上
 ../yihu-one/yh check . --strict
 ```
 

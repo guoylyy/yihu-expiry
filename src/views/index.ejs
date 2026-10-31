@@ -51,17 +51,17 @@
       <label class="field"><span>提前提醒天数</span>
         <input id="f-remind" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="4" data-default="<%= limits.remindDefault %>">
       </label>
-      <div class="field">
-        <span id="assign-label">负责人</span>
-        <button class="pick" id="f-assign" type="button" aria-labelledby="assign-label f-assign-name"><span id="f-assign-name">未指定</span><span aria-hidden="true">›</span></button>
+      <div class="field" data-optional="assign">
+        <span id="assign-label">负责人<span class="opt">选填</span></span>
+        <button class="pick" id="f-assign" type="button" aria-labelledby="assign-label f-assign-name"><span id="f-assign-name">选择负责人</span><span aria-hidden="true">›</span></button>
       </div>
-      <label class="field"><span>金额</span>
+      <label class="field" data-optional="amount"><span>金额<span class="opt">选填</span></span>
         <input id="f-amount" type="text" inputmode="decimal" maxlength="20" autocomplete="off">
       </label>
-      <label class="field"><span>备注</span>
+      <label class="field" data-optional="note"><span>备注<span class="opt">选填</span></span>
         <textarea id="f-note" rows="2" maxlength="<%= limits.note %>"></textarea>
       </label>
-      <div class="field">
+      <div class="field" data-optional="att">
         <span>附件</span>
         <div class="att-row" id="att-current" hidden>
           <a class="pick" id="att-link" target="_blank" rel="noopener"></a>
@@ -72,6 +72,7 @@
           <span id="f-file-name">选择文件（PDF、图片、Word，10MB 以内）</span>
         </label>
       </div>
+      <button class="btn wide" id="sheet-more" type="button" hidden>补充更多信息</button>
     </div>
     <footer class="sheet-foot">
       <button class="btn danger" id="sheet-delete" type="button" hidden>删除</button>
