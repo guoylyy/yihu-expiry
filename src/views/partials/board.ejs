@@ -1,0 +1,53 @@
+<% const on = (w) => filter.window === w %>
+<nav class="stats" aria-label="到期统计">
+  <a class="stat s-expired<%= on('expired') ? ' on' : '' %>" href="<%= href({ w: on('expired') ? '' : 'expired' }) %>" data-filter>已过期 <b><%= stats.expired %></b></a>
+  <span class="sep" aria-hidden="true">·</span>
+  <a class="stat s-red<%= on('7') ? ' on' : '' %>" href="<%= href({ w: on('7') ? '' : '7' }) %>" data-filter>7 天内 <b><%= stats.in7 %></b></a>
+  <span class="sep" aria-hidden="true">·</span>
+  <a class="stat s-yellow<%= on('30') ? ' on' : '' %>" href="<%= href({ w: on('30') ? '' : '30' }) %>" data-filter>30 天内 <b><%= stats.in30 %></b></a>
+</nav>
+
+<form class="filters" id="filters" data-window="<%= filter.window %>">
+  <select id="filter-cat" name="cat" aria-label="按类别筛选">
+    <option value="">全部类别</option>
+    <% for (const c of categories) { %><option value="<%= c %>"<%= filter.category === c ? ' selected' : '' %>><%= c %></option><% } %>
+  </select>
+  <select id="filter-who" name="who" aria-label="按负责人筛选">
+    <option value="">全部负责人</option>
+    <option value="none"<%= filter.who === 'none' ? ' selected' : '' %>>未指定</option>
+    <% for (const p of people) { %><option value="<%= p.id %>"<%= filter.who === String(p.id) ? ' selected' : '' %>><%= p.name %></option><% } %>
+  </select>
+  <a class="chip<%= on('expired') ? ' on' : '' %>" id="only-expired" href="<%= href({ w: on('expired') ? '' : 'expired' }) %>" data-filter<%- on('expired') ? ' aria-current="true"' : '' %>>只看已过期</a>
+</form>
+
+<% if (!items.length) { %>
+  <div class="empty">
+    <% if (stats.total || filter.category || filter.who) { %>
+      <p>没有符合条件的条目。</p>
+      <a class="btn" href="./" data-filter>清除筛选</a>
+    <% } else { %>
+      <p>还没有条目。把合同、证照的到期日记下来，到期前会提醒你。</p>
+      <button class="btn" type="button" data-batch>批量录入</button>
+    <% } %>
+  </div>
+<% } else { %>
+  <ul class="cards">
+    <% for (const t of items) { %>
+      <li class="card t-<%= t.tier %>" data-id="<%= t.id %>">
+        <p class="days"><%= t.days_text %></p>
+        <div class="head">
+          <button class="name" type="button" data-open title="<%= t.name %>"><span><%= t.name %></span></button>
+          <span class="tag"><%= t.category %></span>
+        </div>
+        <dl class="kv">
+          <div><dt>到期日</dt><dd><%= t.due_date %></dd></div>
+          <div><dt>负责人</dt><dd><%= t.assignee || '未指定' %></dd></div>
+          <% if (t.attachment) { %>
+            <div class="kv-att"><dt>附件</dt><dd><a class="att" href="<%= t.attachment.url %>" target="_blank" rel="noopener" aria-label="打开附件：<%= t.attachment.name %>"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="m21 11-8.8 8.8a5.5 5.5 0 0 1-7.8-7.8l9.2-9.2a3.7 3.7 0 0 1 5.2 5.2l-9.2 9.2a1.8 1.8 0 0 1-2.6-2.6l8.5-8.5"/></svg><span><%= t.attachment.name %></span></a></dd></div>
+          <% } %>
+        </dl>
+      </li>
+    <% } %>
+  </ul>
+  <% if (truncated) { %><p class="note-line">只显示最早到期的 <%= limit %> 条，用筛选缩小范围。</p><% } %>
+<% } %>

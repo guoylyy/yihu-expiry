@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<base href="<%= base %>">
+<title>到期台账</title>
+<link rel="stylesheet" href="static/app.css?v=<%= version %>">
+<script src="static/app.js?v=<%= version %>" defer></script>
+</head>
+<body>
+<main class="page">
+  <header class="top">
+    <h1>到期台账</h1>
+    <nav class="links" aria-label="更多">
+      <% if (!problem) { %>
+        <button class="link" id="open-batch" type="button">批量录入</button>
+        <a class="link" href="settings">设置</a>
+      <% } %>
+    </nav>
+    <span class="ver" id="version">v<%= version %></span>
+  </header>
+
+  <% if (problem) { %>
+    <p class="empty"><%= problem %></p>
+  <% } else { %>
+    <section id="board"><%- include('partials/board') %></section>
+    <button class="fab" id="open-new" type="button">新建</button>
+  <% } %>
+</main>
+
+<dialog class="sheet" id="sheet" aria-labelledby="sheet-title">
+  <form class="sheet-box" id="item-form" novalidate data-max-bytes="<%= maxBytes %>">
+    <header class="sheet-head">
+      <h2 id="sheet-title">新建条目</h2>
+      <button class="icon" type="button" data-close aria-label="关闭">×</button>
+    </header>
+    <div class="sheet-body">
+      <p class="note-line" id="sheet-hint" hidden></p>
+      <label class="field"><span>名称</span>
+        <input id="f-name" type="text" maxlength="<%= limits.name %>" required autocomplete="off">
+      </label>
+      <label class="field"><span>到期日</span>
+        <input id="f-due" type="date" required>
+      </label>
+      <label class="field"><span>类别</span>
+        <select id="f-category">
+          <% for (const c of categories) { %><option value="<%= c %>"><%= c %></option><% } %>
+        </select>
+      </label>
+      <label class="field"><span>提前提醒天数</span>
+        <input id="f-remind" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="4" data-default="<%= limits.remindDefault %>">
+      </label>
+      <div class="field">
+        <span id="assign-label">负责人</span>
+        <button class="pick" id="f-assign" type="button" aria-labelledby="assign-label f-assign-name"><span id="f-assign-name">未指定</span><span aria-hidden="true">›</span></button>
+      </div>
+      <label class="field"><span>金额</span>
+        <input id="f-amount" type="text" inputmode="decimal" maxlength="20" autocomplete="off">
+      </label>
+      <label class="field"><span>备注</span>
+        <textarea id="f-note" rows="2" maxlength="<%= limits.note %>"></textarea>
+      </label>
+      <div class="field">
+        <span>附件</span>
+        <div class="att-row" id="att-current" hidden>
+          <a class="pick" id="att-link" target="_blank" rel="noopener"></a>
+          <button class="btn" id="att-remove" type="button">移除</button>
+        </div>
+        <label class="file" id="att-pick">
+          <input id="f-file" type="file" accept="<%= accept %>" aria-label="选择附件">
+          <span id="f-file-name">选择文件（PDF、图片、Word，10MB 以内）</span>
+        </label>
+      </div>
+    </div>
+    <footer class="sheet-foot">
+      <button class="btn danger" id="sheet-delete" type="button" hidden>删除</button>
+      <button class="btn primary wide" id="sheet-save" type="submit">保存</button>
+    </footer>
+  </form>
+</dialog>
+
+<dialog class="sheet" id="batch" aria-labelledby="batch-title">
+  <form class="sheet-box" id="batch-form" novalidate>
+    <header class="sheet-head">
+      <h2 id="batch-title">批量录入</h2>
+      <button class="icon" type="button" data-close aria-label="关闭">×</button>
+    </header>
+    <div class="sheet-body">
+      <p class="note-line">每行一条：名称, 到期日, 类别。到期日写 2026-11-20 或 2026/11/20，类别是 <%= categories.join(' / ') %>。</p>
+      <label class="field"><span>内容</span>
+        <textarea id="batch-text" rows="7" placeholder="华东仓租赁合同, 2026-11-20, 合同"></textarea>
+      </label>
+      <div id="batch-result" hidden>
+        <p class="note-line" id="batch-summary"></p>
+        <ul class="bad" id="batch-bad"></ul>
+        <ul class="good" id="batch-good"></ul>
+      </div>
+    </div>
+    <footer class="sheet-foot">
+      <button class="btn primary wide" id="batch-go" type="submit">解析预览</button>
+    </footer>
+  </form>
+</dialog>
+
+<dialog class="sheet" id="picker" aria-labelledby="picker-title">
+  <div class="sheet-box">
+    <header class="sheet-head">
+      <h2 id="picker-title">选择负责人</h2>
+      <button class="icon" type="button" data-close aria-label="关闭">×</button>
+    </header>
+    <div class="sheet-body">
+      <input id="picker-q" type="search" placeholder="搜姓名或部门" aria-label="搜姓名或部门">
+      <p class="note-line" id="picker-msg" hidden></p>
+      <ul class="people" id="picker-list"></ul>
+    </div>
+    <footer class="sheet-foot">
+      <button class="btn wide" id="picker-none" type="button">不指定</button>
+    </footer>
+  </div>
+</dialog>
+
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+</body>
+</html>

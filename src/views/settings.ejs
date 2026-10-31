@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<base href="<%= base %>">
+<title>设置 · 到期台账</title>
+<link rel="stylesheet" href="static/app.css?v=<%= version %>">
+</head>
+<body>
+<main class="page">
+  <header class="top">
+    <h1>设置</h1>
+    <nav class="links" aria-label="更多"><a class="link" href="./">返回台账</a></nav>
+    <span class="ver" id="version">v<%= version %></span>
+  </header>
+
+  <section class="panel">
+    <h2>到期提醒</h2>
+    <p class="state state-<%= notice.state %>" id="notice-state"><%= notice.text %></p>
+    <p class="note-line" id="notice-detail"><%= notice.detail %></p>
+    <% if (notice.last) { %>
+      <p class="note-line" id="notice-last">最近一次（<%= notice.last.today %>）：要提醒 <%= notice.last.users %> 人，发出 <%= notice.last.sent %> 人<% if (notice.last.skipped + notice.last.failed) { %>，<%= notice.last.skipped + notice.last.failed %> 人没收到：<%= notice.last.reason %><% } %></p>
+    <% } %>
+  </section>
+
+  <section class="panel">
+    <h2>时区</h2>
+    <p class="note-line">剩余天数和提醒时间都按 <%= tz %> 算。</p>
+  </section>
+</main>
+</body>
+</html>

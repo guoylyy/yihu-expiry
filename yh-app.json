@@ -1,0 +1,24 @@
+{
+  "code": "expiry",
+  "name": "到期台账",
+  "icon": "⏳",
+  "category": "效率",
+  "description": "合同、证照、资质、保险的到期日一本账：还剩几天一眼看清，到期前主动提醒",
+  "version": "0.1.0",
+  "port": 3000,
+  "health": "/health",
+  "callback": "/sso/callback",
+  "mcp": "/mcp",
+  "database": true,
+  "memory": "256m",
+  "visibility": null,
+  "isDefault": false,
+  "env": {},
+  "deploy": {
+    "branch": "release",
+    "mode": "auto"
+  },
+  "ui": {
+    "responsive": true
+  }
+}
