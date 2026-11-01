@@ -1,126 +1,126 @@
-<!doctype html>
-<html lang="zh-CN">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<base href="<%= base %>">
-<title>到期台账</title>
-<link rel="stylesheet" href="static/app.css?v=<%= version %>">
-<script src="static/app.js?v=<%= version %>" defer></script>
-</head>
-<body>
-<main class="page">
-  <header class="top">
+<%- include('layout/head') %>
+<main class="yh-app yh-app--wide">
+  <div class="yh-page-head head-row">
     <h1>到期台账</h1>
-    <nav class="links" aria-label="更多">
-      <% if (!problem) { %>
-        <button class="link" id="open-batch" type="button">批量录入</button>
-        <a class="link" href="settings">设置</a>
-      <% } %>
-    </nav>
-    <span class="ver" id="version">v<%= version %></span>
-  </header>
+    <% if (!problem) { %>
+      <nav class="head-links" aria-label="操作">
+        <a class="yh-btn yh-btn--text" id="import-btn" href="import">导入</a>
+        <button class="yh-btn yh-btn--text" id="open-export" type="button">导出</button>
+        <button class="yh-btn yh-btn--text head-new" id="open-new" type="button">新建</button>
+      </nav>
+    <% } %>
+    <p class="yh-sub">合同、证照的到期日一本账，到期前主动提醒。</p>
+  </div>
 
   <% if (problem) { %>
-    <p class="empty"><%= problem %></p>
+    <div class="yh-error">
+      <p><%= problem %></p>
+      <button class="yh-btn yh-btn--ghost" type="button" data-reload>重试</button>
+    </div>
   <% } else { %>
     <section id="board"><%- include('partials/board') %></section>
-    <button class="fab" id="open-new" type="button">新建</button>
   <% } %>
 </main>
 
-<dialog class="sheet" id="sheet" aria-labelledby="sheet-title">
-  <form class="sheet-box" id="item-form" novalidate data-max-bytes="<%= maxBytes %>">
-    <header class="sheet-head">
+<% if (!problem) { %>
+<dialog class="yh-sheet" id="sheet" aria-labelledby="sheet-title">
+  <form class="yh-sheet-box" id="item-form" novalidate data-max-bytes="<%= maxBytes %>" data-default-assignee="<%= defaultAssignee.id ?? '' %>" data-default-assignee-name="<%= defaultAssignee.name %>">
+    <header class="yh-sheet-head">
       <h2 id="sheet-title">新建条目</h2>
       <button class="icon" type="button" data-close aria-label="关闭">×</button>
     </header>
-    <div class="sheet-body">
-      <p class="note-line" id="sheet-hint" hidden></p>
-      <label class="field"><span>名称</span>
+    <div class="yh-sheet-body">
+      <p class="note-line sheet-hint" id="sheet-hint" hidden></p>
+      <label class="yh-field"><span class="yh-label">名称</span>
         <input id="f-name" type="text" maxlength="<%= limits.name %>" required autocomplete="off">
       </label>
-      <label class="field"><span>到期日</span>
+      <label class="yh-field"><span class="yh-label">到期日</span>
         <input id="f-due" type="date" required>
       </label>
-      <label class="field"><span>类别</span>
-        <select id="f-category">
-          <% for (const c of categories) { %><option value="<%= c %>"><%= c %></option><% } %>
-        </select>
+      <label class="yh-field"><span class="yh-label">类别</span>
+        <span class="yh-select"><select id="f-category">
+          <% for (const c of formCategories) { %><option value="<%= c %>"><%= c %></option><% } %>
+        </select></span>
       </label>
-      <label class="field"><span>提前提醒天数</span>
+      <label class="yh-field"><span class="yh-label">提前提醒天数</span>
         <input id="f-remind" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="4" data-default="<%= limits.remindDefault %>">
       </label>
-      <div class="field" data-optional="assign">
-        <span id="assign-label">负责人<span class="opt">选填</span></span>
-        <button class="pick" id="f-assign" type="button" aria-labelledby="assign-label f-assign-name"><span id="f-assign-name">选择负责人</span><span aria-hidden="true">›</span></button>
+      <div class="yh-field" data-optional="assign">
+        <span class="yh-label" id="assign-label">负责人<span class="opt">选填</span></span>
+        <button class="pick" id="f-assign" type="button" aria-labelledby="assign-label f-assign-name"><span class="pick-text" id="f-assign-name">选择负责人</span><span aria-hidden="true">›</span></button>
       </div>
-      <label class="field" data-optional="amount"><span>金额<span class="opt">选填</span></span>
+      <label class="yh-field" data-optional="amount"><span class="yh-label">金额<span class="opt">选填</span></span>
         <input id="f-amount" type="text" inputmode="decimal" maxlength="20" autocomplete="off">
       </label>
-      <label class="field" data-optional="note"><span>备注<span class="opt">选填</span></span>
+      <label class="yh-field" data-optional="note"><span class="yh-label">备注<span class="opt">选填</span></span>
         <textarea id="f-note" rows="2" maxlength="<%= limits.note %>"></textarea>
       </label>
-      <div class="field" data-optional="att">
-        <span>附件</span>
+      <div class="yh-field" data-optional="att">
+        <span class="yh-label">附件</span>
         <div class="att-row" id="att-current" hidden>
           <a class="pick" id="att-link" target="_blank" rel="noopener"></a>
-          <button class="btn" id="att-remove" type="button">移除</button>
+          <button class="yh-btn yh-btn--ghost" id="att-remove" type="button">移除</button>
         </div>
         <label class="file" id="att-pick">
           <input id="f-file" type="file" accept="<%= accept %>" aria-label="选择附件">
           <span id="f-file-name">选择文件（PDF、图片、Word，10MB 以内）</span>
         </label>
       </div>
-      <button class="btn wide" id="sheet-more" type="button" hidden>补充更多信息</button>
+      <button class="yh-btn yh-btn--ghost wide" id="sheet-more" type="button" hidden>补充更多信息</button>
     </div>
-    <footer class="sheet-foot">
-      <button class="btn danger" id="sheet-delete" type="button" hidden>删除</button>
-      <button class="btn primary wide" id="sheet-save" type="submit">保存</button>
+    <footer class="yh-sheet-foot">
+      <button class="yh-btn yh-btn--ghost yh-btn--danger" id="sheet-delete" type="button" hidden>删除</button>
+      <button class="yh-btn" id="sheet-save" type="submit">保存</button>
     </footer>
   </form>
 </dialog>
 
-<dialog class="sheet" id="batch" aria-labelledby="batch-title">
-  <form class="sheet-box" id="batch-form" novalidate>
-    <header class="sheet-head">
+<dialog class="yh-sheet" id="batch" aria-labelledby="batch-title">
+  <form class="yh-sheet-box" id="batch-form" novalidate>
+    <header class="yh-sheet-head">
       <h2 id="batch-title">批量录入</h2>
       <button class="icon" type="button" data-close aria-label="关闭">×</button>
     </header>
-    <div class="sheet-body">
-      <p class="note-line">每行一条：名称, 到期日, 类别。到期日写 2026-11-20 或 2026/11/20，类别是 <%= categories.join(' / ') %>。</p>
-      <label class="field"><span>内容</span>
-        <textarea id="batch-text" rows="7" placeholder="华东仓租赁合同, 2026-11-20, 合同"></textarea>
+    <div class="yh-sheet-body">
+      <p class="note-line sheet-hint">不经过 AI，每行一条：名称, 到期日, 类别。到期日写 2026-11-20 或 2026/11/20，类别是 <%= formCategories.join(' / ') %>。</p>
+      <label class="yh-field"><span class="yh-label">内容</span>
+        <textarea id="batch-text" rows="7" placeholder="华东仓租赁合同, 2026-11-20, 租赁合同"></textarea>
       </label>
       <div id="batch-result" hidden>
-        <p class="note-line" id="batch-summary"></p>
+        <p class="note-line sheet-hint" id="batch-summary"></p>
         <ul class="bad" id="batch-bad"></ul>
         <ul class="good" id="batch-good"></ul>
       </div>
     </div>
-    <footer class="sheet-foot">
-      <button class="btn primary wide" id="batch-go" type="submit">解析预览</button>
+    <footer class="yh-sheet-foot">
+      <button class="yh-btn" id="batch-go" type="submit">解析预览</button>
     </footer>
   </form>
 </dialog>
 
-<dialog class="sheet" id="picker" aria-labelledby="picker-title">
-  <div class="sheet-box">
-    <header class="sheet-head">
-      <h2 id="picker-title">选择负责人</h2>
+<dialog class="yh-sheet yh-sheet--auto" id="export" aria-labelledby="export-title">
+  <form class="yh-sheet-box" id="export-form" method="dialog">
+    <header class="yh-sheet-head">
+      <h2 id="export-title">导出</h2>
       <button class="icon" type="button" data-close aria-label="关闭">×</button>
     </header>
-    <div class="sheet-body">
-      <input id="picker-q" type="search" placeholder="搜姓名或部门" aria-label="搜姓名或部门">
-      <p class="note-line" id="picker-msg" hidden></p>
-      <ul class="people" id="picker-list"></ul>
+    <div class="yh-sheet-body">
+      <fieldset class="yh-field choices">
+        <legend class="yh-label">范围</legend>
+        <label class="choice"><input type="radio" name="scope" value="filtered" checked><span>当前筛选</span></label>
+        <label class="choice"><input type="radio" name="scope" value="all"><span>全部</span></label>
+      </fieldset>
+      <fieldset class="yh-field choices">
+        <legend class="yh-label">格式</legend>
+        <label class="choice"><input type="radio" name="format" value="csv" checked><span>CSV（Excel 打开）</span></label>
+        <label class="choice"><input type="radio" name="format" value="md"><span>Markdown</span></label>
+      </fieldset>
     </div>
-    <footer class="sheet-foot">
-      <button class="btn wide" id="picker-none" type="button">不指定</button>
+    <footer class="yh-sheet-foot">
+      <a class="yh-btn" id="export-go" href="export" download>下载</a>
     </footer>
-  </div>
+  </form>
 </dialog>
-
-<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
-</body>
-</html>
+<%- include('partials/picker') %>
+<% } %>
+<%- include('layout/foot') %>

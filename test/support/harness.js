@@ -9,15 +9,19 @@ import { createItems } from '../../src/items.js'
 import { createNotifier, createReminder } from '../../src/reminder.js'
 import { startFakePlatform } from './fake-platform.mjs'
 
-export async function startHarness() {
+export async function clearTables(pool) {
+  for (const t of ['expiry_item', 'expiry_setting']) await pool.query(`DELETE FROM ${t}`)
+}
+
+export async function startHarness({ aiTimeoutMs = 300 } = {}) {
   const pool = createPool(process.env.TEST_DATABASE_URL)
   await ensureSchema(pool)
-  await pool.query('DELETE FROM expiry_item')
+  await clearTables(pool)
   const dataDir = await mkdtemp(path.join(tmpdir(), 'expiry-test-'))
   const platform = await startFakePlatform()
   const ws = new Workspace({ clientId: 'cid', clientSecret: 'secret', apiUrl: platform.url, webUrl: platform.url, appUrl: 'http://placeholder', basePath: '' })
   const reminder = createReminder({ items: createItems({ pool }), notifier: createNotifier(ws), url: 'http://app.test/' })
-  const app = createApp({ ws, pool, reminder, dataDir })
+  const app = createApp({ ws, pool, reminder, dataDir, aiTimeoutMs })
   const server = await new Promise((resolve) => { const s = app.listen(0, '127.0.0.1', () => resolve(s)) })
   const base = `http://127.0.0.1:${server.address().port}`
   ws.appUrl = base
@@ -48,8 +52,9 @@ export async function startHarness() {
     return {
       get: (p, headers) => call('GET', p, undefined, headers),
       post: (p, b = {}) => call('POST', p, b),
+      put: (p, b = {}) => call('PUT', p, b),
       patch: (p, b = {}) => call('PATCH', p, b),
-      del: (p) => call('DELETE', p),
+      del: (p, b) => call('DELETE', p, b),
       upload: async (id, filename, buffer) => {
         const r = await fetch(`${base}/api/items/${id}/attachment`, {
           method: 'PUT',
@@ -58,8 +63,16 @@ export async function startHarness() {
         })
         return { status: r.status, json: await r.json().catch(() => null) }
       },
+      importFile: async (name, bytes) => {
+        const r = await fetch(`${base}/api/import/file?name=${encodeURIComponent(name)}`, { method: 'POST', headers: { cookie, 'Content-Type': 'application/octet-stream' }, body: bytes })
+        return { status: r.status, json: await r.json().catch(() => null) }
+      },
       download: async (id) => {
         const r = await fetch(`${base}/attachments/${id}`, { headers: { cookie }, redirect: 'manual' })
+        return { status: r.status, headers: r.headers, body: Buffer.from(await r.arrayBuffer()) }
+      },
+      raw: async (p) => {
+        const r = await fetch(base + p, { headers: { cookie }, redirect: 'manual' })
         return { status: r.status, headers: r.headers, body: Buffer.from(await r.arrayBuffer()) }
       }
     }

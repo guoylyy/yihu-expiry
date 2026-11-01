@@ -4,6 +4,7 @@ COPY package*.json ./
 RUN npm ci --omit=dev --no-audit --no-fund
 COPY yh-app.json ./
 COPY src ./src
+RUN date -u +%Y-%m-%dT%H:%M:%SZ > BUILD_TIME
 RUN mkdir -p /data && chown node:node /data
 ENV NODE_ENV=production PORT=3000
 EXPOSE 3000

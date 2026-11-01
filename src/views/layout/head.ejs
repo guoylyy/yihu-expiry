@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<base href="<%= base %>">
+<title>到期台账</title>
+<link rel="icon" type="image/svg+xml" href="static/icon.svg?v=<%= version %>">
+<link rel="stylesheet" href="static/yh-vi.css?v=<%= version %>">
+<link rel="stylesheet" href="static/app.css?v=<%= version %>">
+<script src="static/app.js?v=<%= version %>" defer></script>
+<script src="static/title.js?v=<%= version %>" defer></script>
+<% if (script) { %><script src="static/<%= script %>.js?v=<%= version %>" defer></script><% } %>
+</head>
+<body>
+<header class="yh-top">
+  <a class="yh-top-brand" href="./">
+    <svg class="brand-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 3.88L18.57 5.83A2 2 0 0 1 20 7.74L20 11.64A2 2 0 0 1 19.38 13.09L12 20.13L4.62 13.09A2 2 0 0 1 4 11.64L4 7.74A2 2 0 0 1 5.43 5.83L12 3.88Z"/>
+      <path d="M12 7v4.25l3.9 2.25"/>
+      <path d="M10.5 15.5a1.5 1.5 0 1 0 3 0a1.5 1.5 0 1 0 -3 0Z" fill="#d2521e" stroke="none"/>
+    </svg>到期台账</a>
+  <div class="yh-top-right">
+    <span class="yh-ver" id="version">v<%= version %></span>
+    <details class="yh-menu" id="user-menu">
+      <summary aria-label="账号菜单"><span class="yh-avatar"><%= initial %></span></summary>
+      <nav class="yh-menu-list" aria-label="账号菜单">
+        <span class="yh-menu-ver">版本 v<%= version %></span>
+        <a href="settings">设置</a>
+        <a href="about">关于</a>
+        <% if (hosted) { %><a href="logout?redirect=<%= base %>" id="logout-link">退出</a><% } %>
+      </nav>
+    </details>
+  </div>
+</header>

@@ -1,9 +1,8 @@
-// 每日提醒：每小时醒一次，当地 09:00 之后当天第一次醒来时扫一遍（重启后也能补上）。
+// 每日提醒：每个整点醒一次。每人几点收在设置里配，到点之后当天第一次醒来时发（重启后也能补上）。
 // 进程内定时器，没有外部定时服务。发不出去绝不记成已提醒：平台说 skipped 的人没收到，下一天还会再试
 import { clockIn, daysLeft, daysText, tierOf, todayIn, tzName } from './dates.js'
 
 const HOUR_MS = 3600_000
-const REMIND_HOUR = 9
 const MAX_ITEMS = 20
 const NAME_CLIP = 60
 const PROBE_TIMEOUT_MS = 3000
@@ -59,9 +58,13 @@ export function buildMessage(userId, items, today, url) {
   return { userIds: [userId], title, content: lines.join('\n'), ...(url ? { url } : {}) }
 }
 
-/** 扫一轮：一人一条汇总。单人失败不影响别人；没发出去的不记档，改天还会提醒 */
-export async function scan({ items, notifier, url, today, now = new Date(), tz = tzName() }) {
+/**
+ * 扫一轮：一人一条汇总。单人失败不影响别人；没发出去的不记档，改天还会提醒。
+ * hour 给了就只发到点的人；skip 是今天已经处理过的人。关了平台通知的人不发
+ */
+export async function scan({ items, notifier, url, today, now = new Date(), tz = tzName(), hour = 24, skip = new Set() }) {
   const fresh = (await items.dueForReminder(today))
+    .filter((r) => r.notify_platform && r.remind_hour <= hour && !skip.has(r.user_id))
     .map((r) => ({ ...r, tier: tierOf(daysLeft(r.due_date, today)) }))
     .filter((r) => !alreadyReminded(r, r.tier, today, tz))
   const byUser = new Map()
@@ -70,7 +73,7 @@ export async function scan({ items, notifier, url, today, now = new Date(), tz =
     byUser.get(r.user_id).push(r)
   }
 
-  const result = { users: byUser.size, sent: 0, skipped: 0, failed: 0, forbidden: false, reason: '' }
+  const result = { users: byUser.size, sent: 0, skipped: 0, failed: 0, forbidden: false, reason: '', done: [] }
   for (const [userId, list] of byUser) {
     let out
     try {
@@ -82,6 +85,7 @@ export async function scan({ items, notifier, url, today, now = new Date(), tz =
       if (e.forbidden) { result.forbidden = true; break } // 没权限，后面的人也发不出去
       continue
     }
+    result.done.push(userId)
     if (!out.sent.some((s) => s.userId === userId)) {
       result.skipped++
       result.reason = out.skipped[0]?.reason ?? '平台没有发出'
@@ -96,17 +100,22 @@ export async function scan({ items, notifier, url, today, now = new Date(), tz =
 }
 
 export function createReminder({ items, notifier, url = '', tz = tzName() }) {
-  let doneOn = null
+  let day = null
+  let doneUsers = new Set() // 今天已经处理过的人：有人早上收过，下午录的第二天才提醒
+  let stopped = false // 平台 403：今天后面的人也发不出去
   let last = null
 
   /** 定时器每次醒来调这个。网络类失败当天下一小时重试（已发出的人有逐条去重，不会重复） */
   async function tick(now = new Date()) {
     if (!notifier.available) return null
     const today = todayIn(tz, now)
-    if (clockIn(tz, now).hour < REMIND_HOUR || doneOn === today) return null
-    const result = await scan({ items, notifier, url, today, now, tz })
+    if (day !== today) { day = today; doneUsers = new Set(); stopped = false }
+    if (stopped) return null
+    const result = await scan({ items, notifier, url, today, now, tz, hour: clockIn(tz, now).hour, skip: doneUsers })
+    if (!result.users) return null
     last = { ...result, at: now, today }
-    if (!result.failed || result.forbidden) doneOn = today
+    for (const id of result.done) doneUsers.add(id)
+    if (result.forbidden) stopped = true
     console.log(`[expiry] 到期提醒：发出 ${result.sent}/${result.users} 人`)
     return result
   }
@@ -114,13 +123,15 @@ export function createReminder({ items, notifier, url = '', tz = tzName() }) {
   function start() {
     const run = () => tick().catch((e) => console.warn(`[expiry] 到期提醒失败：${e.message}`))
     run()
-    setInterval(run, HOUR_MS).unref()
-    console.log(notifier.available ? `[expiry] 到期提醒已开启（${tz} ${REMIND_HOUR}:00）` : '[expiry] 未配置平台凭证，不会主动提醒')
+    // 对齐到整点，设了 9 点的人不会拖到 9 点 50
+    setTimeout(() => { run(); setInterval(run, HOUR_MS).unref() }, HOUR_MS - Date.now() % HOUR_MS).unref()
+    console.log(notifier.available ? `[expiry] 到期提醒已开启（${tz}，每人几点在设置里配）` : '[expiry] 未配置平台凭证，不会主动提醒')
   }
 
   /** 设置页用。只有确认能发才说已配置，不把「没报错」当成「发出去了」 */
-  async function status() {
-    const hour = `每天 ${String(REMIND_HOUR).padStart(2, '0')}:00（${tz}）`
+  async function status({ remind_hour: remindHour = 9, notify_platform: enabled = true } = {}) {
+    if (!enabled) return { state: 'off', text: '平台通知已关闭', detail: '不会往钉钉、飞书、企业微信发提醒。下面的开关可以重新打开。', last }
+    const hour = `每天 ${String(remindHour).padStart(2, '0')}:00（${tz}）`
     const probe = await notifier.probe()
     if (probe === 'unconfigured') return { state: 'off', text: '未配置，不会主动提醒', detail: '应用没有拿到平台凭证。', last }
     if (probe === 'forbidden') return { state: 'off', text: '未配置，不会主动提醒', detail: '只有管理员安装或登记的应用才能经平台发消息。', last }

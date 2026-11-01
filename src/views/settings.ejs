@@ -1,33 +1,72 @@
-<!doctype html>
-<html lang="zh-CN">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<base href="<%= base %>">
-<title>设置 · 到期台账</title>
-<link rel="stylesheet" href="static/app.css?v=<%= version %>">
-</head>
-<body>
-<main class="page">
-  <header class="top">
+<%- include('layout/head') %>
+<main class="yh-app">
+  <a class="back" href="./">‹ 台账</a>
+  <div class="yh-page-head">
     <h1>设置</h1>
-    <nav class="links" aria-label="更多"><a class="link" href="./">返回台账</a></nav>
-    <span class="ver" id="version">v<%= version %></span>
-  </header>
+    <p class="yh-sub">改完立即生效，只影响你自己。</p>
+  </div>
 
-  <section class="panel">
-    <h2>到期提醒</h2>
+  <section class="yh-card settings-group">
+    <h2 class="section-title">到期提醒</h2>
     <p class="state state-<%= notice.state %>" id="notice-state"><%= notice.text %></p>
     <p class="note-line" id="notice-detail"><%= notice.detail %></p>
     <% if (notice.last) { %>
       <p class="note-line" id="notice-last">最近一次（<%= notice.last.today %>）：要提醒 <%= notice.last.users %> 人，发出 <%= notice.last.sent %> 人<% if (notice.last.skipped + notice.last.failed) { %>，<%= notice.last.skipped + notice.last.failed %> 人没收到：<%= notice.last.reason %><% } %></p>
     <% } %>
-  </section>
-
-  <section class="panel">
-    <h2>时区</h2>
     <p class="note-line">剩余天数和提醒时间都按 <%= tz %> 算。</p>
   </section>
+
+  <section class="yh-card settings-group" id="settings" data-owner-id="<%= cfg.default_assignee_id ?? '' %>" data-owner-name="<%= defaultOwner %>">
+    <h2 class="section-title">默认值</h2>
+    <label class="yh-field"><span class="yh-label">默认提醒天数</span>
+      <input id="s-remind" type="number" inputmode="numeric" min="0" max="<%= remindMax %>" value="<%= cfg.default_remind_days %>">
+      <span class="yh-hint">新建和导入时没写提前多少天，就用这个。</span>
+      <span class="yh-field-error" id="s-remind-error" hidden></span>
+    </label>
+    <label class="yh-field"><span class="yh-label">提醒时间</span>
+      <span class="yh-select"><select id="s-hour">
+        <% for (const h of hours) { %><option value="<%= h %>"<%= h === cfg.remind_hour ? ' selected' : '' %>>每天 <%= String(h).padStart(2, '0') %>:00</option><% } %>
+      </select></span>
+    </label>
+    <div class="yh-field">
+      <span class="yh-label" id="owner-label">默认负责人</span>
+      <button class="pick" id="s-owner" type="button" aria-labelledby="owner-label s-owner-name"><span class="pick-text" id="s-owner-name">不指定</span><span aria-hidden="true">›</span></button>
+      <p class="yh-hint">新建和导入时没写负责人，就指给这个人，对方能看到条目，也由对方收提醒。</p>
+    </div>
+  </section>
+
+  <section class="yh-card settings-group">
+    <h2 class="section-title">通知</h2>
+    <label class="switch"><span class="switch-text"><span>平台通知</span><span class="yh-hint">到点往钉钉、飞书、企业微信发一条汇总</span></span><span class="check"><input id="s-platform" type="checkbox"<%= cfg.notify_platform ? ' checked' : '' %>><i></i></span></label>
+  </section>
+
+  <section class="yh-card settings-group" id="cat-box" data-categories="<%= JSON.stringify(categories) %>" data-max="<%= categoriesMax %>">
+    <h2 class="section-title">分类</h2>
+    <ul class="bare" id="cat-list"></ul>
+    <form class="cat-add" id="cat-add">
+      <input class="yh-input" id="cat-name" type="text" maxlength="8" placeholder="新分类，最多 8 个字" aria-label="新分类名称" autocomplete="off">
+      <button class="yh-btn yh-btn--ghost" id="cat-add-btn" type="submit">添加</button>
+    </form>
+    <p class="yh-hint">删除分类后，其下的条目转到「其他」。「其他」是兜底分类，不能改名和删除。AI 只能从这些分类里选。</p>
+  </section>
 </main>
-</body>
-</html>
+
+<dialog class="yh-sheet yh-sheet--auto" id="rename" aria-labelledby="rename-title">
+  <form class="yh-sheet-box" id="rename-form" novalidate>
+    <header class="yh-sheet-head">
+      <h2 id="rename-title">改名</h2>
+      <button class="icon" type="button" data-close aria-label="关闭">×</button>
+    </header>
+    <div class="yh-sheet-body">
+      <label class="yh-field"><span class="yh-label">分类名称</span>
+        <input id="rename-input" type="text" maxlength="8" autocomplete="off">
+      </label>
+      <p class="yh-hint">这个分类下的条目会跟着改。</p>
+    </div>
+    <footer class="yh-sheet-foot">
+      <button class="yh-btn" id="rename-save" type="submit">保存</button>
+    </footer>
+  </form>
+</dialog>
+<%- include('partials/picker') %>
+<%- include('layout/foot') %>

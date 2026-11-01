@@ -24,7 +24,7 @@ const pool = url ? createPool(url) : null
 let ready = false
 
 const reminder = pool ? createReminder({ items: createItems({ pool }), notifier: createNotifier(ws), url: ws.appUrl ? `${ws.appUrl}/` : '' }) : null
-const app = createApp({ ws, pool, getReady: () => ready, reminder, dataDir })
+const app = createApp({ ws, pool, getReady: () => ready, reminder, dataDir, aiTimeoutMs: Number(process.env.EXPIRY_AI_TIMEOUT_MS) || undefined })
 
 async function prepare() {
   try {

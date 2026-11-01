@@ -1,0 +1,67 @@
+<%- include('layout/head') %>
+<main class="yh-app">
+  <a class="back" href="./">‹ 台账</a>
+  <div class="yh-page-head">
+    <h1>导入合同和证照</h1>
+    <p class="yh-sub" id="import-sub">上传文件或粘贴文字，AI 抽出到期条目，你确认后才入库。</p>
+  </div>
+
+  <div id="step-upload">
+    <p class="back-confirm"><button class="yh-btn yh-btn--ghost" id="back-confirm" type="button" hidden>回到确认，已识别的还在</button></p>
+    <div class="import-grid">
+      <section class="yh-card">
+        <h2 class="section-title">上传文件</h2>
+        <input class="file-input" id="file-input" type="file" multiple accept="<%= accept %>,.png,.jpg,.jpeg" aria-label="选择文件">
+        <label class="drop" id="drop" for="file-input">
+          <strong>选择文件，或拖到这里</strong>
+          <span>.pdf .docx .txt .md，单个不超过 10MB，一次最多 <%= filesMax %> 个</span>
+        </label>
+      </section>
+      <section class="yh-card">
+        <form id="paste-form">
+          <label class="yh-field"><span class="yh-label section-title">粘贴文字</span>
+            <textarea id="paste-text" rows="4" maxlength="<%= textMax %>" placeholder="合同关键信息、证照信息，或者一张台账表，整段粘进来"></textarea>
+          </label>
+          <div class="paste-foot">
+            <span class="note-line">最多 5 万字</span>
+            <button class="yh-btn" id="paste-btn" type="submit">识别这段文字</button>
+          </div>
+        </form>
+      </section>
+    </div>
+
+    <div class="yh-skeleton" id="busy" hidden><i></i></div>
+    <ul class="bare results" id="results" aria-live="polite"></ul>
+
+    <section class="yh-card degrade" id="degrade" hidden>
+      <p id="degrade-text"></p>
+      <div class="head-actions">
+        <a class="yh-btn" id="manual-new" href="./?new=1">手动新增</a>
+        <a class="yh-btn yh-btn--ghost" href="./?batch=1">批量录入</a>
+      </div>
+    </section>
+
+    <p class="batch-entry"><a class="yh-btn yh-btn--ghost" id="batch-link" href="./?batch=1">不经过 AI，按行批量录入</a></p>
+
+    <section class="yh-card yh-plain">
+      <h2 class="section-title">支持的格式</h2>
+      <ul class="bare">
+        <li class="yh-row"><span class="yh-row-main"><span class="yh-row-title">粘贴文字</span></span><span class="yh-row-sub">合同关键信息、证照信息、一整张台账表都行</span></li>
+        <li class="yh-row"><span class="yh-row-main"><span class="yh-row-title">PDF .pdf</span></span><span class="yh-row-sub">要带文字层，只读前 <%= pdfPages %> 页；扫描件读不了，请粘贴文字</span></li>
+        <li class="yh-row"><span class="yh-row-main"><span class="yh-row-title">Word .docx</span></span><span class="yh-row-sub">读正文和表格；老版 .doc 请先另存为 .docx</span></li>
+        <li class="yh-row"><span class="yh-row-main"><span class="yh-row-title">文本 .txt .md</span></span><span class="yh-row-sub">UTF-8 或 GBK 编码都可以</span></li>
+        <li class="yh-row"><span class="yh-row-main"><span class="yh-row-title">图片 .png .jpg</span><span class="yh-tag">暂未开通</span></span><span class="yh-row-sub">图片识别暂未开通，请先把证件信息转成文字</span></li>
+      </ul>
+    </section>
+  </div>
+
+  <div id="step-confirm" hidden>
+    <ul class="bare results" id="confirm-notices"></ul>
+    <ul class="bare confirm-list" id="rows" data-categories="<%= JSON.stringify(categories) %>" data-remind-default="<%= remindDefault %>" data-remind-max="<%= remindMax %>" data-default-owner="<%= defaultOwner %>"></ul>
+    <div class="confirm-bar">
+      <button class="yh-btn yh-btn--ghost" id="add-more" type="button">继续添加</button>
+      <button class="yh-btn" id="commit" type="button">导入 0 条</button>
+    </div>
+  </div>
+</main>
+<%- include('layout/foot') %>

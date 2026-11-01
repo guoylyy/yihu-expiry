@@ -22,7 +22,7 @@ function parseDays(v) {
   return n
 }
 
-export function buildTools({ items, onCreated }) {
+export function buildTools({ items, settings, onCreated }) {
   return [
     {
       name: 'list_expiring',
@@ -51,13 +51,13 @@ export function buildTools({ items, onCreated }) {
         properties: {
           name: { type: 'string', description: '名称，如「华东仓租赁合同」' },
           due_date: { type: 'string', description: '到期日：YYYY-MM-DD 或 YYYY/MM/DD，也接受明天、30天后' },
-          category: { type: 'string', enum: CATEGORIES, description: '类别，不填为其他' }
+          category: { type: 'string', description: `类别，不填为其他。默认有 ${CATEGORIES.join('、')}，用户可以在设置里增删，不在清单里会报错` }
         },
         required: ['name', 'due_date']
       },
       run: async (user, args) => {
         const today = todayIn()
-        const item = await items.create(user.id, toolInput(args, today), { source: 'ai' })
+        const item = await items.create(user.id, await settings.withDefaults(user.id, toolInput(args, today)), { source: 'ai' })
         onCreated?.(user, item)
         return brief(item, today)
       }

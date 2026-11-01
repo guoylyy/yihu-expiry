@@ -24,12 +24,35 @@ const TABLES = [
     INDEX idx_owner_due (owner_id, due_date),
     INDEX idx_assignee_due (assignee_id, due_date),
     INDEX idx_due (due_date)
+  ) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci`,
+  `CREATE TABLE IF NOT EXISTS expiry_setting (
+    user_id INT NOT NULL PRIMARY KEY,
+    categories JSON NULL,
+    default_remind_days INT NOT NULL DEFAULT 30,
+    remind_hour TINYINT NOT NULL DEFAULT 9,
+    default_assignee_id INT NULL,
+    notify_platform TINYINT(1) NOT NULL DEFAULT 1,
+    notify_inapp TINYINT(1) NOT NULL DEFAULT 1,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
   ) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci`
+]
+
+// 已有列要改定义的登记在这里：done 看 information_schema 的值判断改过没有，要先于 ADDED_COLUMNS 执行
+//   due_date 放开 NULL：导入时抽不到到期日的条目也要入库，靠 needs_date 标记
+export const CHANGED_COLUMNS = [
+  { table: 'expiry_item', column: 'due_date', ddl: 'DATE NULL', done: (c) => c.nullable === 'YES' },
+  { table: 'expiry_item', column: 'source', ddl: "ENUM('self','batch','ai','import') NOT NULL DEFAULT 'self'", done: (c) => c.type.includes("'import'") }
 ]
 
 // 建表之后新增的列登记在这里：{ table, column, ddl }，ddl 是 ADD COLUMN 后面那段定义
 // 回滚只回代码不回库，新列要可空或有默认值
-export const ADDED_COLUMNS = []
+//   expire_at 是 due_date 的虚拟列：对外口径叫到期日 expire_at，写入只走 due_date。不改列名，回滚到旧代码还能跑
+export const ADDED_COLUMNS = [
+  { table: 'expiry_item', column: 'needs_date', ddl: 'TINYINT(1) NOT NULL DEFAULT 0' },
+  { table: 'expiry_item', column: 'file_name', ddl: 'VARCHAR(255) NULL' },
+  { table: 'expiry_item', column: 'owner_name', ddl: 'VARCHAR(50) NULL' },
+  { table: 'expiry_item', column: 'expire_at', ddl: 'DATE GENERATED ALWAYS AS (due_date) VIRTUAL' }
+]
 
 /** 所有时间按 UTC 进出库；DATE 保持字符串，避免被驱动按时区挪一天 */
 export function createPool(url) {
@@ -48,7 +71,18 @@ export async function ensureColumn(pool, { table, column, ddl }) {
   return true
 }
 
+export async function changeColumn(pool, { table, column, ddl, done }) {
+  const [[row]] = await pool.execute(
+    'SELECT IS_NULLABLE AS nullable, COLUMN_TYPE AS type FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?',
+    [table, column]
+  )
+  if (!row || done(row)) return false
+  await pool.query('ALTER TABLE ?? MODIFY COLUMN ?? ' + ddl, [table, column])
+  return true
+}
+
 export async function ensureSchema(pool, columns = ADDED_COLUMNS) {
   for (const sql of TABLES) await pool.query(sql)
+  for (const c of CHANGED_COLUMNS) await changeColumn(pool, c)
   for (const c of columns) await ensureColumn(pool, c)
 }

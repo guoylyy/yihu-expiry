@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { addDays, clockIn, daysLeft, daysText, parseDate, parseDueWord, tierOf, todayIn } from '../src/dates.js'
+import { addDays, clockIn, daysLeft, daysText, monthDayText, parseDate, parseDueWord, tierOf, todayIn } from '../src/dates.js'
 
 test('剩余天数：同月', () => assert.equal(daysLeft('2026-11-20', '2026-11-05'), 15))
 test('剩余天数：跨月（10 月 31 → 11 月 1）', () => assert.equal(daysLeft('2026-11-01', '2026-10-31'), 1))
@@ -14,6 +14,11 @@ test('剩余天数：已过期且跨年', () => assert.equal(daysLeft('2025-12-3
 for (const [days, tier] of [[-1, 'expired'], [0, 'red'], [1, 'red'], [7, 'red'], [8, 'yellow'], [30, 'yellow'], [31, 'gray']]) {
   test(`分档边界：${days} 天 → ${tier}`, () => assert.equal(tierOf(days), tier))
 }
+
+test('文案：日历标题的几月几日，不补零', () => {
+  assert.equal(monthDayText('2026-11-06'), '11 月 6 日')
+  assert.equal(monthDayText('2027-01-30'), '1 月 30 日')
+})
 
 test('文案：已过期 / 今天 / N 天后', () => {
   assert.equal(daysText(-5), '已过期 5 天')

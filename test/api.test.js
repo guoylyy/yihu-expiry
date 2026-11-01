@@ -5,7 +5,7 @@ import path from 'node:path'
 import { startHarness } from './support/harness.js'
 import { createApp, formatAmount } from '../src/app.js'
 import { Workspace } from '../src/yh-one.mjs'
-import { addDays, todayIn } from '../src/dates.js'
+import { addDays, monthRange, todayIn } from '../src/dates.js'
 import { VERSION } from '../src/version.js'
 import { MAX_BYTES } from '../src/attachments.js'
 import { createItems } from '../src/items.js'
@@ -46,7 +46,7 @@ const stored = async () => (await readdir(path.join(h.dataDir, 'attachments')).c
 test('/health 免登录，返回规定格式', async () => {
   const r = await fetch(`${h.base}/health`)
   assert.equal(r.status, 200)
-  assert.deepEqual(await r.json(), { status: 'ok', version: '0.1.1' })
+  assert.deepEqual(await r.json(), { status: 'ok', version: '0.2.4' })
 })
 
 test('版本号三处一致：清单、package.json、页面', async () => {
@@ -139,19 +139,19 @@ test('SQL 参数化：名称里带引号和注释符不报错，原样存回', a
 test('SQL 参数化：筛选参数和批量录入里的引号也不进 SQL', async () => {
   await create(alice, { name: 'x' })
   assert.deepEqual(await names(alice, `?cat=${encodeURIComponent("' OR 1=1 --")}&who=${encodeURIComponent('1 OR 1=1')}&w=${encodeURIComponent("'")}`), ['x'])
-  const r = await alice.post('/api/batch', { text: "O'Neil -- 证, 2026-12-01, 证照" })
+  const r = await alice.post('/api/batch', { text: "O'Neil -- 证, 2026-12-01, 营业执照" })
   assert.equal(r.json.created, 1)
   assert.ok((await names(alice)).includes("O'Neil -- 证"))
 })
 
 test('修改：只传的字段变，其余不动', async () => {
-  const t = await create(alice, { name: 'A', amount: '10', remind_days: 7, category: '合同' })
+  const t = await create(alice, { name: 'A', amount: '10', remind_days: 7, category: '租赁合同' })
   const r = await alice.patch(`/api/items/${t.id}`, { name: 'B' })
   assert.equal(r.status, 200)
   assert.equal(r.json.name, 'B')
   assert.equal(r.json.amount, '10.00')
   assert.equal(r.json.remind_days, 7)
-  assert.equal(r.json.category, '合同')
+  assert.equal(r.json.category, '租赁合同')
 })
 
 test('改名后 DATE 不被时区挪一天', async () => {
@@ -191,11 +191,11 @@ test('列表字段：剩余天数、档位、文案', async () => {
 
 test('统计：30 天内包含 7 天内，不含已过期', async () => {
   for (const d of [-3, -1, 0, 5, 7, 8, 30, 31, 60]) await create(alice, { due_date: addDays(today, d) })
-  assert.deepEqual((await alice.get('/api/items')).json.stats, { total: 9, expired: 2, in7: 3, in30: 5 })
+  assert.deepEqual((await alice.get('/api/items')).json.stats, { total: 9, expired: 2, today: 1, in7: 3, in30: 5, needs: 0 })
 })
 
 test('统计：没有任何条目时是 0 不是 null', async () => {
-  assert.deepEqual((await alice.get('/api/items')).json.stats, { total: 0, expired: 0, in7: 0, in30: 0 })
+  assert.deepEqual((await alice.get('/api/items')).json.stats, { total: 0, expired: 0, today: 0, in7: 0, in30: 0, needs: 0 })
 })
 
 test('筛选：时间窗口和统计口径一致', async () => {
@@ -206,15 +206,15 @@ test('筛选：时间窗口和统计口径一致', async () => {
 })
 
 test('筛选：类别、负责人、未指定，可叠加；统计跟着类别走、不跟时间窗口走', async () => {
-  await create(alice, { name: '合同甲', category: '合同', assignee_id: BOB, due_date: addDays(today, -1) })
-  await create(alice, { name: '合同乙', category: '合同' })
+  await create(alice, { name: '合同甲', category: '租赁合同', assignee_id: BOB, due_date: addDays(today, -1) })
+  await create(alice, { name: '合同乙', category: '租赁合同' })
   await create(alice, { name: '保险丙', category: '保险', assignee_id: BOB })
-  assert.deepEqual(await names(alice, `?cat=${encodeURIComponent('合同')}`), ['合同甲', '合同乙'])
+  assert.deepEqual(await names(alice, `?cat=${encodeURIComponent('租赁合同')}`), ['合同甲', '合同乙'])
   assert.deepEqual(await names(alice, `?who=${BOB}`), ['合同甲', '保险丙'])
   assert.deepEqual(await names(alice, '?who=none'), ['合同乙'])
   assert.deepEqual(await names(alice, `?who=${BOB}&cat=${encodeURIComponent('保险')}`), ['保险丙'])
-  const { stats } = (await alice.get(`/api/items?w=expired&cat=${encodeURIComponent('合同')}`)).json
-  assert.deepEqual(stats, { total: 2, expired: 1, in7: 0, in30: 1 })
+  const { stats } = (await alice.get(`/api/items?w=expired&cat=${encodeURIComponent('租赁合同')}`)).json
+  assert.deepEqual(stats, { total: 2, expired: 1, today: 0, in7: 0, in30: 1, needs: 0 })
 })
 
 test('看板 HTML：三种颜色、相对天数、负责人姓名；用户内容被转义', async () => {
@@ -228,7 +228,7 @@ test('看板 HTML：三种颜色、相对天数、负责人姓名；用户内容
   assert.ok(!text.includes('<img src=x'))
 })
 
-const cardsOf = (html) => html.slice(html.indexOf('<ul class="cards">'))
+const cardsOf = (html) => html.slice(html.indexOf('id="items"'), html.indexOf('<aside'))
 const count = (text, word) => text.split(word).length - 1
 
 test('看板 HTML：没负责人的卡片不渲染负责人这行，也不写「未指定」', async () => {
@@ -236,7 +236,7 @@ test('看板 HTML：没负责人的卡片不渲染负责人这行，也不写「
   await create(alice, { name: '空的乙' })
   const { text } = await alice.get('/api/board.html')
   const cards = cardsOf(text)
-  assert.equal(count(cards, 'class="card t-'), 2)
+  assert.equal(count(cards, 'class="yh-row item t-'), 2)
   assert.ok(!cards.includes('负责人'))
   assert.ok(!cards.includes('未指定'))
   assert.ok(!cards.includes('—'))
@@ -247,9 +247,8 @@ test('看板 HTML：有负责人的才渲染这行，同一页里互不影响', 
   await create(alice, { name: '空的' })
   await create(alice, { name: '有人', assignee_id: BOB })
   const cards = cardsOf((await alice.get('/api/board.html')).text)
-  assert.equal(count(cards, '<dt>负责人</dt>'), 1)
-  assert.equal(count(cards, '<dd>李雷</dd>'), 1)
-  assert.equal(count(cards, '<dt>到期日</dt>'), 2)
+  assert.equal(count(cards, 'class="item-owner"'), 1)
+  assert.equal(count(cards, '负责人 李雷'), 1)
 })
 
 test('看板 HTML：没附件的卡片不渲染附件行，有附件的才有', async () => {
@@ -258,8 +257,113 @@ test('看板 HTML：没附件的卡片不渲染附件行，有附件的才有', 
   assert.ok(!cardsOf((await alice.get('/api/board.html')).text).includes('附件'))
   await alice.upload(withFile.id, 'a.pdf', PDF)
   const cards = cardsOf((await alice.get('/api/board.html')).text)
-  assert.equal(count(cards, '<dt>附件</dt>'), 1)
   assert.equal(count(cards, 'class="att"'), 1)
+})
+
+test('看板 HTML：副行顺序固定为分类、日期、负责人、金额，缺的不占位', async () => {
+  await create(alice, { name: '全有', category: '租赁合同', assignee_id: BOB, amount: '240000' })
+  await create(alice, { name: '只有金额', category: '租赁合同', amount: '100' })
+  await create(alice, { name: '只有负责人', category: '租赁合同', assignee_id: BOB })
+  const cards = cardsOf((await alice.get('/api/board.html')).text)
+  const meta = (name) => {
+    const row = cards.slice(cards.indexOf(`title="${name}"`))
+    return row.slice(row.indexOf('item-meta'), row.indexOf('</li>')).match(/class="(yh-tag|item-date|item-owner|item-amount)"/g).map((m) => m.slice(7, -1))
+  }
+  assert.deepEqual(meta('全有'), ['yh-tag', 'item-date', 'item-owner', 'item-amount'])
+  assert.deepEqual(meta('只有金额'), ['yh-tag', 'item-date', 'item-amount'])
+  assert.deepEqual(meta('只有负责人'), ['yh-tag', 'item-date', 'item-owner'])
+})
+
+test('看板 HTML：统计压成一行，没有卡片，0 不上色', async () => {
+  await create(alice, { name: '过期', due_date: addDays(today, -2) })
+  const { text } = await alice.get('/api/board.html')
+  const line = text.slice(text.indexOf('class="stat-line"'), text.indexOf('id="filters"'))
+  assert.deepEqual([...line.matchAll(/<span>([^<]+)<\/span><b class="days">(\d+)/g)].map((m) => `${m[1]} ${m[2]}`), ['已过期 1', '今天 0', '7 天内 0', '30 天内 0'])
+  assert.ok(line.includes('class="stat t-expired"') && line.includes('class="stat t-gray"'))
+  assert.ok(!line.includes('needs-notice'))
+})
+
+test('看板 HTML：缺日期只有统计行末尾一个 chip，点了筛选，再点关掉', async () => {
+  await alice.post('/api/import/commit', { items: [{ name: '缺日期', category: '其他', expire_at: null }] })
+  await create(alice, { name: '有日期' })
+  const { text } = await alice.get('/api/board.html')
+  assert.equal(count(text, 'id="needs-notice"'), 1)
+  const line = text.slice(text.indexOf('class="stat-line"'), text.indexOf('id="filters"'))
+  assert.ok(line.includes('class="chip needs-chip" id="needs-notice" href="?w=needs"') && line.includes('>只看缺到期日</a>'))
+  assert.ok(!text.slice(text.indexOf('class="filter-row"')).includes('needs-notice'))
+  const on = (await alice.get('/api/board.html?w=needs')).text
+  assert.equal(count(on, 'id="needs-notice"'), 1)
+  assert.ok(on.includes('class="chip needs-chip on" id="needs-notice" href="./"') && on.includes('aria-current="true">只看缺到期日</a>'))
+  assert.equal(count(cardsOf(on), 'class="yh-row item t-'), 1)
+})
+
+test('看板 HTML：没有缺日期时没有入口；筛空了入口还在，能关掉', async () => {
+  await create(alice, { name: '有日期' })
+  assert.ok(!(await alice.get('/api/board.html')).text.includes('needs-notice'))
+  const on = (await alice.get('/api/board.html?w=needs')).text
+  assert.ok(on.includes('class="chip needs-chip on" id="needs-notice" href="./"'))
+})
+
+test('看板 HTML：分类是带计数的下拉，没有分类 chips 那一块', async () => {
+  await create(alice, { name: '甲', category: '租赁合同' })
+  await create(alice, { name: '乙', category: '租赁合同' })
+  await create(alice, { name: '丙', category: '保险' })
+  const { text } = await alice.get('/api/board.html')
+  const select = text.slice(text.indexOf('id="filter-cat"'), text.indexOf('id="filter-who"'))
+  assert.ok(select.includes('<option value="">分类</option>'))
+  assert.ok(select.includes('<option value="租赁合同">租赁合同 2</option>'))
+  assert.ok(select.includes('<option value="保险">保险 1</option>'))
+  assert.ok(select.includes('<option value="保修">保修 0</option>'))
+  assert.ok(!text.includes('class="chips') && !text.includes('class="chip'))
+})
+
+test('看板 HTML：选中的分类下拉保持选中，列表上方有一个可关闭的 chip', async () => {
+  await create(alice, { name: '甲', category: '租赁合同' })
+  await create(alice, { name: '丙', category: '保险', assignee_id: BOB })
+  const { text } = await alice.get(`/api/board.html?cat=${encodeURIComponent('租赁合同')}&who=${BOB}`)
+  assert.ok(text.includes('<option value="租赁合同" selected>租赁合同 0</option>'))
+  assert.equal(count(text, 'id="clear-category"'), 1)
+  assert.ok(text.includes(`id="clear-category" href="?who=${BOB}"`) && text.includes('aria-label="取消分类筛选：租赁合同"'))
+  assert.ok(text.indexOf('id="clear-category"') > text.indexOf('id="filters"'))
+})
+
+test('看板 HTML：分类计数跟着负责人走，不受当前分类和时间窗口影响', async () => {
+  await create(alice, { name: '甲', category: '租赁合同', due_date: addDays(today, -2) })
+  await create(alice, { name: '乙', category: '租赁合同', assignee_id: BOB })
+  await create(alice, { name: '丙', category: '保险' })
+  const cat = encodeURIComponent('保险')
+  assert.ok((await alice.get(`/api/board.html?cat=${cat}&w=expired`)).text.includes('>租赁合同 2</option>'))
+  const mine = (await alice.get(`/api/board.html?who=${BOB}`)).text
+  assert.ok(mine.includes('>租赁合同 1</option>') && mine.includes('>保险 0</option>'))
+})
+
+test('分类计数只算自己看得到的条目', async () => {
+  await create(alice, { name: '甲', category: '租赁合同' })
+  await create(alice, { name: '乙', category: '租赁合同', assignee_id: BOB })
+  assert.ok((await bob.get('/api/board.html')).text.includes('>租赁合同 1</option>'))
+})
+
+test('首页页头：导入、导出、新建是并排的文字链，新建加粗，没有大按钮', async () => {
+  await create(alice, { name: '甲' })
+  const { text } = await alice.get('/')
+  const links = text.slice(text.indexOf('class="head-links"'), text.indexOf('</nav>', text.indexOf('class="head-links"')))
+  assert.deepEqual([...links.matchAll(/class="([^"]+)" id="([\w-]+)"/g)].map((m) => [m[2], m[1]]), [
+    ['import-btn', 'yh-btn yh-btn--text'],
+    ['open-export', 'yh-btn yh-btn--text'],
+    ['open-new', 'yh-btn yh-btn--text head-new']
+  ])
+})
+
+test('日历：本月每天都是 button，有到期项才有圆点，选中后标题写几月几日几项', async () => {
+  const month = today.slice(0, 7)
+  const { json: t } = await alice.post('/api/items', { name: '那天', due_date: `${month}-15`, category: '其他' })
+  const cal = (await alice.get(`/api/board.html?view=calendar&day=${t.due_date}`)).text
+  assert.equal(count(cal, '<i class="days dot"></i>'), 1)
+  assert.equal(count(cal, '<button class="cal-day'), Number(monthRange(month)[1].slice(8)))
+  assert.ok(!cal.includes('<a class="cal-day'))
+  assert.ok(cal.includes(`>${Number(month.slice(5))} 月 15 日 · 1 项</h2>`))
+  assert.ok(new RegExp(`data-href="[^"]*" data-date="${month}-16"`).test(cal))
+  assert.ok((await alice.get('/api/board.html?view=calendar')).text.includes('到期 · 1 项</h2>'))
 })
 
 test('看板 HTML：金额、备注为空时卡片上没有对应的行', async () => {
@@ -275,8 +379,8 @@ test('筛选里的「未指定」保留，能筛出没指派的，选中态也�
   assert.ok(all.includes('<option value="none">未指定</option>'))
   const none = (await alice.get('/api/board.html?who=none')).text
   assert.ok(none.includes('<option value="none" selected>未指定</option>'))
-  assert.equal(count(cardsOf(none), 'class="card t-'), 1)
-  assert.ok(none.includes('空的') && !none.includes('有人'))
+  assert.equal(count(cardsOf(none), 'class="yh-row item t-'), 1)
+  assert.ok(cardsOf(none).includes('空的') && !cardsOf(none).includes('有人'))
 })
 
 test('首页：整页只有筛选里那一处「未指定」', async () => {
@@ -289,16 +393,16 @@ test('新建表单：负责人、金额、备注标选填，名称和到期日�
   const { text } = await alice.get('/')
   assert.equal(count(text, '<span class="opt">选填</span>'), 3)
   for (const label of ['负责人', '金额', '备注']) assert.ok(text.includes(`${label}<span class="opt">选填</span>`), label)
-  assert.ok(text.includes('<span>名称</span>') && text.includes('<span>到期日</span>'))
+  assert.ok(text.includes('<span class="yh-label">名称</span>') && text.includes('<span class="yh-label">到期日</span>'))
   assert.ok(/id="f-name"[^>]*required/.test(text) && /id="f-due"[^>]*required/.test(text))
   assert.ok(/id="f-amount"[^>]*inputmode="decimal"/.test(text))
   for (const key of ['assign', 'amount', 'note', 'att']) assert.ok(text.includes(`data-optional="${key}"`), key)
 })
 
-test('清单：版本 0.1.1 且两处一致，手动发布', async () => {
+test('清单：版本 0.2.4 且两处一致，手动发布', async () => {
   const read = async (f) => JSON.parse(await readFile(new URL(`../${f}`, import.meta.url), 'utf8'))
   const [manifest, pkg] = await Promise.all([read('yh-app.json'), read('package.json')])
-  assert.equal(manifest.version, '0.1.1')
+  assert.equal(manifest.version, '0.2.4')
   assert.equal(pkg.version, manifest.version)
   assert.equal(manifest.deploy.mode, 'manual')
 })
@@ -456,7 +560,7 @@ test('附件：文件权限不开放给其他用户', async () => {
 
 // ---------- 批量录入 ----------
 test('批量：预览不落库，提交入库，坏行列出', async () => {
-  const text = 'A, 2026-11-20, 合同\nB, 乱写, 合同\nC, 2026/12/01, 保险\n缺列'
+  const text = 'A, 2026-11-20, 租赁合同\nB, 乱写, 租赁合同\nC, 2026/12/01, 保险\n缺列'
   const p = await alice.post('/api/batch/preview', { text })
   assert.equal(p.json.rows.length, 2)
   assert.deepEqual(p.json.errors.map((e) => e.line), [2, 4])
@@ -474,7 +578,7 @@ test('批量：全是坏行时不提交，报错', async () => {
 })
 
 test('批量：只进自己名下', async () => {
-  await alice.post('/api/batch', { text: 'A, 2026-11-20, 合同' })
+  await alice.post('/api/batch', { text: 'A, 2026-11-20, 租赁合同' })
   assert.deepEqual(await names(carol), [])
 })
 
@@ -522,7 +626,7 @@ test('MCP：不带 token 401；tools/list 正好两个工具', async () => {
 })
 
 test('MCP：create_expiry 接受斜线日期和随口说的日期', async () => {
-  const r = await h.mcp('tools/call', { name: 'create_expiry', arguments: { name: '营业执照', due_date: '2027/03/01', category: '证照' } }, `token-${ALICE}`)
+  const r = await h.mcp('tools/call', { name: 'create_expiry', arguments: { name: '营业执照', due_date: '2027/03/01', category: '营业执照' } }, `token-${ALICE}`)
   assert.equal(r.json.result.structuredContent.due_date, '2027-03-01')
   const s = await h.mcp('tools/call', { name: 'create_expiry', arguments: { name: '保单', due_date: '30天后' } }, `token-${ALICE}`)
   assert.equal(s.json.result.structuredContent.days_left, 30)

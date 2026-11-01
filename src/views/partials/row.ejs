@@ -1,0 +1,13 @@
+<li class="yh-row item t-<%= t.tier %>" data-id="<%= t.id %>">
+  <span class="yh-row-main">
+    <button class="item-name" type="button" data-open title="<%= t.name %>"><span data-fit="52"><%= t.name %></span></button>
+    <span class="days"><%= t.days_text %></span>
+  </span>
+  <span class="yh-row-sub item-meta">
+    <span class="yh-tag"><%= t.category %></span>
+    <% if (t.due_date) { %><span class="item-date"><%= t.due_date %></span><% } %>
+    <% if (t.owner) { %><span class="item-owner">负责人 <%= t.owner %></span><% } %>
+    <% if (t.amount_text) { %><span class="item-amount"><%= t.amount_text %></span><% } %>
+    <% if (t.attachment) { %><a class="att" href="<%= t.attachment.url %>" target="_blank" rel="noopener" aria-label="打开附件：<%= t.attachment.name %>" title="<%= t.attachment.name %>"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="m21 11-8.8 8.8a5.5 5.5 0 0 1-7.8-7.8l9.2-9.2a3.7 3.7 0 0 1 5.2 5.2l-9.2 9.2a1.8 1.8 0 0 1-2.6-2.6l8.5-8.5"/></svg><span><%= t.attachment.name %></span></a><% } %>
+  </span>
+</li>

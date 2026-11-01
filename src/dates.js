@@ -44,6 +44,31 @@ export function parseDate(input) {
   return isValidDate(s) && year >= YEAR_MIN && year <= YEAR_MAX ? s : null
 }
 
+/** 模型和文件里的写法多一些：再接受 2026.11.20、2026年11月20日 */
+export const parseLooseDate = (input) => parseDate(String(input ?? '').trim().replace(/[.．年月]/g, '-').replace(/日$/, ''))
+
+export const isMonth = (s) => typeof s === 'string' && /^\d{4}-(0[1-9]|1[0-2])$/.test(s) && Number(s.slice(0, 4)) >= YEAR_MIN && Number(s.slice(0, 4)) <= YEAR_MAX
+
+export function addMonths(month, n) {
+  const [y, m] = month.split('-').map(Number)
+  return new Date(Date.UTC(y, m - 1 + n, 1)).toISOString().slice(0, 7)
+}
+
+/** 这个月的第一天和最后一天 */
+export const monthRange = (month) => [`${month}-01`, addDays(`${addMonths(month, 1)}-01`, -1)]
+
+/** 日历的格子：周一开头，补齐前后的整周 */
+export function monthWeeks(month) {
+  const [first, last] = monthRange(month)
+  const start = addDays(first, -((weekdayOf(first) + 6) % 7))
+  const weeks = []
+  for (let d = start; d <= last; d = addDays(d, 7)) weeks.push(Array.from({ length: 7 }, (_, i) => addDays(d, i)))
+  return weeks
+}
+
+/** 2026-11-06 → 11 月 6 日 */
+export const monthDayText = (d) => `${Number(d.slice(5, 7))} 月 ${Number(d.slice(8))} 日`
+
 /** 剩余天数：到期当天是 0，已过期为负 */
 export const daysLeft = (due, today) => daysBetween(today, due)
 

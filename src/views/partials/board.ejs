@@ -1,55 +1,134 @@
-<% const on = (w) => filter.window === w %>
-<nav class="stats" aria-label="到期统计">
-  <a class="stat s-expired<%= on('expired') ? ' on' : '' %>" href="<%= href({ w: on('expired') ? '' : 'expired' }) %>" data-filter>已过期 <b><%= stats.expired %></b></a>
-  <span class="sep" aria-hidden="true">·</span>
-  <a class="stat s-red<%= on('7') ? ' on' : '' %>" href="<%= href({ w: on('7') ? '' : '7' }) %>" data-filter>7 天内 <b><%= stats.in7 %></b></a>
-  <span class="sep" aria-hidden="true">·</span>
-  <a class="stat s-yellow<%= on('30') ? ' on' : '' %>" href="<%= href({ w: on('30') ? '' : '30' }) %>" data-filter>30 天内 <b><%= stats.in30 %></b></a>
-</nav>
-
-<form class="filters" id="filters" data-window="<%= filter.window %>">
-  <select id="filter-cat" name="cat" aria-label="按类别筛选">
-    <option value="">全部类别</option>
-    <% for (const c of categories) { %><option value="<%= c %>"<%= filter.category === c ? ' selected' : '' %>><%= c %></option><% } %>
-  </select>
-  <select id="filter-who" name="who" aria-label="按负责人筛选">
-    <option value="">全部负责人</option>
-    <option value="none"<%= filter.who === 'none' ? ' selected' : '' %>>未指定</option>
-    <% for (const p of people) { %><option value="<%= p.id %>"<%= filter.who === String(p.id) ? ' selected' : '' %>><%= p.name %></option><% } %>
-  </select>
-  <a class="chip<%= on('expired') ? ' on' : '' %>" id="only-expired" href="<%= href({ w: on('expired') ? '' : 'expired' }) %>" data-filter<%- on('expired') ? ' aria-current="true"' : '' %>>只看已过期</a>
-</form>
-
-<% if (!items.length) { %>
-  <div class="empty">
-    <% if (stats.total || filter.category || filter.who) { %>
-      <p>没有符合条件的条目。</p>
-      <a class="btn" href="./" data-filter>清除筛选</a>
+<%
+  const on = (w) => filter.window === w
+  const calendarView = filter.view === 'calendar'
+  const stat = (w, label, value, tier) => ({ w, label, value, tier: value ? tier : 'gray' }) // 0 不上色，红色只留给真有事的格子
+  const statList = [stat('expired', '已过期', stats.expired, 'expired'), stat('today', '今天', stats.today, 'red'), stat('7', '7 天内', stats.in7, 'red'), stat('30', '30 天内', stats.in30, 'yellow')]
+  const empty = !stats.total && !filter.category && !filter.who
+%>
+<div class="split split--rail">
+  <section class="main-col">
+    <% if (empty) { %>
+      <div class="yh-empty">
+        <p>还没有条目。把合同、证照导进来，到期前会提醒你。</p>
+        <a class="yh-btn" href="import">导入</a>
+      </div>
     <% } else { %>
-      <p>还没有条目。把合同、证照的到期日记下来，到期前会提醒你。</p>
-      <button class="btn" type="button" data-batch>批量录入</button>
-    <% } %>
-  </div>
-<% } else { %>
-  <ul class="cards">
-    <% for (const t of items) { %>
-      <li class="card t-<%= t.tier %>" data-id="<%= t.id %>">
-        <p class="days"><%= t.days_text %></p>
-        <div class="head">
-          <button class="name" type="button" data-open title="<%= t.name %>"><span><%= t.name %></span></button>
-          <span class="tag"><%= t.category %></span>
+      <div class="stat-line">
+        <nav class="stats" aria-label="到期统计">
+          <% for (const s of statList) { %>
+            <a class="stat t-<%= s.tier %><%= on(s.w) ? ' on' : '' %>" href="<%= href({ view: 'list', w: on(s.w) ? '' : s.w }) %>" data-filter<%- on(s.w) ? ' aria-current="true"' : '' %>><span><%= s.label %></span><b class="days"><%= s.value %></b></a>
+          <% } %>
+        </nav>
+        <%# 缺日期只有这一个入口，再点一次关掉。筛空了也要留着，不然关不掉 %>
+        <% if (on('needs') || stats.needs) { %>
+          <a class="chip needs-chip<%= on('needs') ? ' on' : '' %>" id="needs-notice" href="<%= href({ view: 'list', w: on('needs') ? '' : 'needs' }) %>" data-filter title="补上之前不会提醒"<%- on('needs') ? ' aria-current="true"' : '' %>>只看缺到期日</a>
+        <% } %>
+      </div>
+
+      <div class="filters" id="filters">
+        <nav class="tabs" aria-label="视图">
+          <a class="tab<%= calendarView ? '' : ' on' %>" href="<%= href({ view: 'list' }) %>" data-filter<%- calendarView ? '' : ' aria-current="page"' %>>列表</a>
+          <a class="tab<%= calendarView ? ' on' : '' %>" id="tab-calendar" href="<%= href({ view: 'calendar', w: '' }) %>" data-filter<%- calendarView ? ' aria-current="page"' : '' %>>日历</a>
+        </nav>
+        <div class="filter-row">
+          <label class="yh-field"><span class="sr-only">按分类筛选</span>
+            <span class="yh-select"><select id="filter-cat" aria-label="按分类筛选">
+              <option value="">分类</option>
+              <% for (const c of categories) { %><option value="<%= c %>"<%= filter.category === c ? ' selected' : '' %>><%= c %> <%= categoryCounts.get(c) ?? 0 %></option><% } %>
+            </select></span>
+          </label>
+          <label class="yh-field"><span class="sr-only">按负责人筛选</span>
+            <span class="yh-select"><select id="filter-who" aria-label="按负责人筛选">
+              <option value="">负责人</option>
+              <option value="none"<%= filter.who === 'none' ? ' selected' : '' %>>未指定</option>
+              <% for (const p of people) { %><option value="<%= p.id %>"<%= filter.who === String(p.id) ? ' selected' : '' %>><%= p.name %></option><% } %>
+            </select></span>
+          </label>
         </div>
-        <dl class="kv">
-          <div><dt>到期日</dt><dd><%= t.due_date %></dd></div>
-          <% if (t.assignee_id) { %>
-            <div><dt>负责人</dt><dd><%= t.assignee %></dd></div>
+      </div>
+
+      <% if (filter.category) { %>
+        <p class="picked"><a class="chip on" id="clear-category" href="<%= href({ cat: '' }) %>" data-filter aria-label="取消分类筛选：<%= filter.category %>"><span><%= filter.category %></span><span aria-hidden="true">×</span></a></p>
+      <% } %>
+
+      <% if (calendarView) { %>
+        <section class="yh-card calendar" id="calendar" aria-label="<%= calendar.label %>">
+          <div class="cal-head">
+            <a class="icon-link" href="<%= href({ month: calendar.prev, day: '' }) %>" data-filter aria-label="上个月">‹</a>
+            <h2 id="cal-label"><%= calendar.label %></h2>
+            <a class="icon-link" href="<%= href({ month: calendar.next, day: '' }) %>" data-filter aria-label="下个月">›</a>
+          </div>
+          <div class="cal-grid cal-weekdays" aria-hidden="true">
+            <% for (const w of ['一', '二', '三', '四', '五', '六', '日']) { %><span><%= w %></span><% } %>
+          </div>
+          <% for (const week of calendar.weeks) { %>
+            <div class="cal-grid">
+              <% for (const d of week) { %>
+                <% if (d.inMonth) { %>
+                  <button class="cal-day<%= d.count ? ` has t-${d.tier}` : '' %><%= d.selected ? ' on' : '' %><%= d.isToday ? ' now' : '' %>" type="button" data-filter data-href="<%= href({ day: d.selected ? '' : d.date }) %>" data-date="<%= d.date %>" aria-label="<%= d.date %><%= d.count ? ` 有 ${d.count} 项到期` : '' %>"<%- d.selected ? ' aria-current="date"' : '' %>><span><%= d.day %></span><% if (d.count) { %><i class="days dot"></i><% } %></button>
+                <% } else { %>
+                  <span class="cal-day out"></span>
+                <% } %>
+              <% } %>
+            </div>
           <% } %>
-          <% if (t.attachment) { %>
-            <div class="kv-att"><dt>附件</dt><dd><a class="att" href="<%= t.attachment.url %>" target="_blank" rel="noopener" aria-label="打开附件：<%= t.attachment.name %>"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="m21 11-8.8 8.8a5.5 5.5 0 0 1-7.8-7.8l9.2-9.2a3.7 3.7 0 0 1 5.2 5.2l-9.2 9.2a1.8 1.8 0 0 1-2.6-2.6l8.5-8.5"/></svg><span><%= t.attachment.name %></span></a></dd></div>
-          <% } %>
-        </dl>
-      </li>
+        </section>
+        <h2 class="group"><%= filter.day ? calendar.dayLabel : `${calendar.label}到期` %> · <%= items.length %> 项</h2>
+      <% } %>
+
+      <% if (items.length) { %>
+        <ul class="bare yh-card yh-plain item-list" id="items">
+          <% for (const t of items) { %><%- include('row', { t }) %><% } %>
+        </ul>
+        <% if (truncated) { %><p class="note-line center">只显示最早到期的 <%= limit %> 条，用筛选缩小范围。</p><% } %>
+      <% } else if (calendarView) { %>
+        <p class="note-line">这段时间没有到期项。</p>
+      <% } else { %>
+        <div class="yh-empty">
+          <p>没有符合条件的条目。</p>
+          <a class="yh-btn yh-btn--ghost" href="./" data-filter>清除筛选</a>
+        </div>
+      <% } %>
+
+      <% if (calendarView && undated.length) { %>
+        <h2 class="group">待补到期日 · <%= undated.length %></h2>
+        <ul class="bare item-list" id="undated">
+          <% for (const t of undated) { %><%- include('row', { t }) %><% } %>
+        </ul>
+      <% } %>
     <% } %>
-  </ul>
-  <% if (truncated) { %><p class="note-line">只显示最早到期的 <%= limit %> 条，用筛选缩小范围。</p><% } %>
-<% } %>
+  </section>
+
+  <aside class="side" aria-label="概览">
+    <section>
+      <h2>本月到期 · <span id="rail-month-total"><%= rail.monthTotal %></span></h2>
+      <% if (rail.month.length) { %>
+        <ul class="bare" id="rail-month">
+          <% for (const t of rail.month) { %>
+            <li class="side-link t-<%= t.tier %>"><span data-fit="26"><%= t.name %></span><span class="count days"><%= t.days_text %></span></li>
+          <% } %>
+        </ul>
+      <% } else { %><p class="note-line">本月没有到期项。</p><% } %>
+    </section>
+    <section>
+      <h2>分类分布</h2>
+      <% if (rail.byCategory.length) { %>
+        <ul class="bare" id="rail-categories">
+          <% for (const c of rail.byCategory) { %>
+            <li><a class="side-link" href="<%= href({ cat: c.name }) %>" data-filter><span><%= c.name %></span><span class="count"><%= c.count %> 项</span></a></li>
+          <% } %>
+        </ul>
+      <% } else { %><p class="note-line">还没有条目。</p><% } %>
+    </section>
+    <section>
+      <h2>最近新增</h2>
+      <% if (rail.recent.length) { %>
+        <ul class="bare" id="rail-recent">
+          <% for (const t of rail.recent) { %>
+            <li class="side-link"><span data-fit="26"><%= t.name %></span><span class="count"><%= t.category %></span></li>
+          <% } %>
+        </ul>
+      <% } else { %><p class="note-line">还没有条目。</p><% } %>
+    </section>
+  </aside>
+</div>
